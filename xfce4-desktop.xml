@@ -3,7 +3,7 @@
   <property name="backdrop">
     <property name="screen0">
       <property name="monitor0">
-        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/wall-redkit-1.jpg"/>
+        <property name="image-path" type="string" value="/usr/share/backgrounds/wall-redkit-1.jpg"/>
         <property name="image-style" type="int" value="5"/>
       </property>
     </property>
