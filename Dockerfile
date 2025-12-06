@@ -37,13 +37,13 @@ RUN useradd -m -s /bin/bash redkit
 RUN mkdir -p /var/run/sshd
 # Set a Linux password for the 'redkit' user so they can SSH in
 # Change 'redkitsshpassword' to whatever default you want
-RUN echo 'redkit:redkitsshpassword' | chpasswd
+RUN echo 'redkit:redkit' | chpasswd
 # explicitely allow password authentication
 RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
 # 5. Lock the Root Account
 # This prevents anyone from doing 'su root' even if they guess a password
-RUN passwd -l root
+# RUN passwd -l root
 
 # 6. Setup VNC (As redkit user)
 WORKDIR /home/redkit
@@ -63,8 +63,9 @@ RUN mkdir -p /home/redkit/.config/tigervnc && \
     chmod +x /home/redkit/.config/tigervnc/xstartup && \
     echo "session=xfce" > /home/redkit/.vnc/config && \
     echo "securityTypes=none" >> /home/redkit/.vnc/config && \
-    echo "geometry=1280x800" >> /home/redkit/.vnc/config && \
-    echo "depth=24" >> /home/redkit/.vnc/config
+    echo "geometry=0x0" >> /home/redkit/.vnc/config && \
+    echo "depth=32" >> /home/redkit/.vnc/config && \
+    echo "RemoteResize=1" >> /home/redkit/.vnc/config
 
 # Fix ownership so redkit can run the process
 RUN chown -R redkit:redkit /home/redkit/.config
@@ -73,7 +74,7 @@ RUN chown -R redkit:redkit /home/redkit/.config
 # We need to start VNC and NoVNC
 RUN echo "#!/bin/bash" > /entrypoint.sh && \
     echo "echo 'Starting VNC Server (as redkit)...'" >> /entrypoint.sh && \
-    echo "su - redkit -c 'vncserver :1 -SecurityTypes none -geometry 1280x800 -depth 24'" >> /entrypoint.sh && \
+    echo "su - redkit -c 'vncserver :1 -SecurityTypes none -geometry 0x0 -depth 32'" >> /entrypoint.sh && \
     echo "echo 'Waiting for VNC server to start...'" >> /entrypoint.sh && \
     echo "sleep 3" >> /entrypoint.sh && \
     echo "echo 'Checking VNC server status...'" >> /entrypoint.sh && \
@@ -86,6 +87,29 @@ RUN echo "#!/bin/bash" > /entrypoint.sh && \
 # 8. Expose Ports
 # 6080 = Web Interface (NoVNC)
 EXPOSE 6080
+
+# Install Tilix and Mousepad, set Tilix as default terminal emulator
+RUN apt-get update && apt-get install -y \
+    terminator \
+    xarchiver \
+    zip unzip \
+    p7zip-full \
+    rar unrar \
+    tar gzip bzip2 xz-utils \
+    mousepad
+
+COPY xfce4-desktop.xml /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/
+COPY wall-redkit-1.jpg wall-redkit-2.jpg /usr/share/backgrounds/xfce/
+
+# Install sudo
+RUN apt-get install -y sudo
+
+# Give redkit sudo privileges
+RUN usermod -aG sudo redkit && echo 'root:root' | chpasswd
+
+# Optional: allow sudo without password
+# RUN echo "redkit ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-redkit && \
+#     chmod 440 /etc/sudoers.d/90-redkit
 
 # 9. Start as Root
 # We must start as root to launch sshd, but we switch to redkit for VNC inside the script
