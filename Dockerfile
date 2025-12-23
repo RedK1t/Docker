@@ -158,8 +158,10 @@ RUN update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulat
 RUN echo 'TerminalEmulator=terminator' > /home/redkit/.config/xfce4/helpers.rc
 
 # 5. Wallpapers
-COPY wall-redkit-1.jpg wall-redkit-2.jpg /usr/share/backgrounds/
+COPY default.jpg /usr/share/backgrounds/xfce
 COPY xfce4-desktop.xml /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/
+
+RUN mkdir -p /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml
 
 # 6. Sudo Privileges
 RUN usermod -aG sudo redkit && echo 'root:root' | chpasswd && \
