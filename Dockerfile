@@ -109,23 +109,6 @@ RUN apt-get update && apt-get install -y \
     fontconfig \
     sudo
 
-# 2. Install Fonts
-# A. Create Custom Font Directory
-RUN mkdir -p /usr/share/fonts/truetype/custom
-
-# B. Download JetBrains Mono (ZIP method)
-RUN wget -qO /tmp/jbmono.zip https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip && \
-    unzip -q /tmp/jbmono.zip -d /tmp/jbmono && \
-    cp /tmp/jbmono/fonts/ttf/*.ttf /usr/share/fonts/truetype/custom/ && \
-    rm -rf /tmp/jbmono.zip /tmp/jbmono
-
-# C. Download Noto Sans Arabic (Direct TTF method using your link)
-# We rename it to 'NotoSansArabic.ttf' to avoid special characters in the filename
-RUN wget -q "https://github.com/google/fonts/raw/refs/heads/main/ofl/notosansarabic/NotoSansArabic%5Bwdth,wght%5D.ttf" -O /usr/share/fonts/truetype/custom/NotoSansArabic.ttf
-
-# D. Refresh Font Cache
-RUN fc-cache -f -v
-
 # 3. Install Qogir Theme & Icons
 RUN git clone https://github.com/vinceliuice/Qogir-theme.git /tmp/Qogir-theme && \
     /tmp/Qogir-theme/install.sh -d /usr/share/themes --tweaks square && \
@@ -137,20 +120,6 @@ RUN git clone https://github.com/vinceliuice/Qogir-theme.git /tmp/Qogir-theme &&
 # Create necessary config directories
 RUN mkdir -p /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/ && \
     mkdir -p /home/redkit/.config/xfce4/terminal/
-
-# A. Generate xsettings.xml
-# Sets Qogir-Dark, Noto Sans Arabic (UI), and JetBrains Mono (Code)
-RUN echo '<?xml version="1.0" encoding="UTF-8"?>' > /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    echo '<channel name="xsettings" version="1.0">' >> /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    echo '  <property name="Net" type="empty">' >> /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    echo '    <property name="ThemeName" type="string" value="Qogir-Dark"/>' >> /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    echo '    <property name="IconThemeName" type="string" value="Qogir-dark"/>' >> /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    echo '  </property>' >> /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    echo '  <property name="Gtk" type="empty">' >> /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    echo '    <property name="FontName" type="string" value="Noto Sans Arabic 10"/>' >> /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    echo '    <property name="MonospaceFontName" type="string" value="JetBrains Mono 10"/>' >> /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    echo '  </property>' >> /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    echo '</channel>' >> /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
 
 # B. Set Terminator as Default
 RUN update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/terminator 50 && \
@@ -192,7 +161,18 @@ RUN apt-get update && \
     # Ensure ownership is set
     chown redkit:redkit /home/redkit/.config/xfce4/helpers.rc
     # NOTE: We removed the failing 'sed' command for defaults.list
+	
+RUN apt-get update && apt-get install -y \
+    fonts-ibm-plex \
+    && rm -rf /var/lib/apt/lists/*
 
+COPY fonts/60-ibm-plex.conf /etc/fonts/conf.d/
+COPY xsettings.xml /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/
+
+COPY gtk/settings.ini /home/redkit/.config/gtk-3.0/settings.ini
+COPY xfce/terminalrc /home/redkit/.config/xfce4/terminal/terminalrc
+
+RUN chown -R redkit:redkit /home/redkit/.config
 
 
 
