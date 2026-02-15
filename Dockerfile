@@ -1,186 +1,136 @@
-# 1. Base Image
-FROM kalilinux/kali-rolling:latest
-
-# Avoid interactive prompts
+# --- Stage 1: The Builder ---
+FROM kalilinux/kali-rolling:latest AS python-builder
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYENV_ROOT="/opt/pyenv"
 
-RUN rm -f /etc/apt/sources.list && \
-    rm -f /etc/apt/sources.list.d/*.list && \
-    echo "deb http://kali.download/kali kali-rolling main non-free-firmware non-free contrib" \
-    > /etc/apt/sources.list && \
-    echo "Acquire::http::No-Cache true;"  >  /etc/apt/apt.conf.d/99no-mirror-cache && \
-    echo "Acquire::https::No-Cache true;" >> /etc/apt/apt.conf.d/99no-mirror-cache
-
-# 2. Install GUI, VNC, Browser AND SSH
-# We use --no-install-recommends to keep the image lighter
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    apt-utils \
-    xfce4 \
-    xfce4-terminal \
-    tigervnc-standalone-server \
-    tigervnc-tools \
-    novnc \
-    websockify \
-    dbus-x11 \
-    net-tools \
-    firefox-esr \
-    openssh-server \
-    vim \
+    build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
+    libsqlite3-dev curl git libncursesw5-dev tk-dev libffi-dev liblzma-dev ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 3. Setup the 'redkit' user (Standard User, NO Root Privileges)
-# We create the user but do NOT add them to the sudoers group.
-RUN useradd -m -s /bin/bash redkit
+RUN git clone https://github.com/pyenv/pyenv.git $PYENV_ROOT && \
+    $PYENV_ROOT/bin/pyenv install 3.10.11 && \
+    $PYENV_ROOT/bin/pyenv global 3.10.11 && \
+    find $PYENV_ROOT -type d -name "test" -prune -exec rm -rf {} +
 
-# 4. Configure SSH
-# Create the privilege separation directory
-RUN mkdir -p /var/run/sshd
-# Set a Linux password for the 'redkit' user so they can SSH in
-# Change 'redkitsshpassword' to whatever default you want
-RUN echo 'redkit:redkit' | chpasswd
-# explicitely allow password authentication
-RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+# --- Stage 2: Final Image ---
+FROM kalilinux/kali-rolling:latest
 
-# 5. Lock the Root Account
-# This prevents anyone from doing 'su root' even if they guess a password
-# RUN passwd -l root
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYENV_ROOT="/opt/pyenv"
+ENV PATH="$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
 
-# 6. Setup VNC (As redkit user)
-WORKDIR /home/redkit
-RUN mkdir -p /home/redkit/.config/tigervnc
-
-# Set VNC password - disabled for no authentication
-RUN mkdir -p /home/redkit/.config/tigervnc && \
-    chown -R redkit:redkit /home/redkit/.config
-
-# Configure XFCE startup and disable VNC password
-RUN mkdir -p /home/redkit/.config/tigervnc && \
-    mkdir -p /home/redkit/.vnc && \
-    echo "#!/bin/sh" > /home/redkit/.config/tigervnc/xstartup && \
-    echo "unset SESSION_MANAGER" >> /home/redkit/.config/tigervnc/xstartup && \
-    echo "unset DBUS_SESSION_BUS_ADDRESS" >> /home/redkit/.config/tigervnc/xstartup && \
-    echo "exec dbus-launch --exit-with-session startxfce4" >> /home/redkit/.config/tigervnc/xstartup && \
-    chmod +x /home/redkit/.config/tigervnc/xstartup && \
-    echo "session=xfce" > /home/redkit/.vnc/config && \
-    echo "securityTypes=none" >> /home/redkit/.vnc/config && \
-    echo "geometry=0x0" >> /home/redkit/.vnc/config && \
-    echo "depth=32" >> /home/redkit/.vnc/config && \
-    echo "RemoteResize=1" >> /home/redkit/.vnc/config
-
-# Fix ownership so redkit can run the process
-RUN chown -R redkit:redkit /home/redkit/.config
-
-# 7. Create the Entrypoint Script
-# We need to start VNC and NoVNC
-RUN echo "#!/bin/bash" > /entrypoint.sh && \
-    echo "echo 'Starting VNC Server (as redkit)...'" >> /entrypoint.sh && \
-    echo "su - redkit -c 'vncserver :1 -SecurityTypes none -geometry 0x0 -depth 32'" >> /entrypoint.sh && \
-    echo "echo 'Waiting for VNC server to start...'" >> /entrypoint.sh && \
-    echo "sleep 3" >> /entrypoint.sh && \
-    echo "echo 'Checking VNC server status...'" >> /entrypoint.sh && \
-    echo "su - redkit -c 'vncserver -list'" >> /entrypoint.sh && \
-    echo "echo 'Starting NoVNC (as redkit)...'" >> /entrypoint.sh && \
-    echo "su - redkit -c 'websockify --web=/usr/share/novnc 6080 localhost:5901' &" >> /entrypoint.sh && \
-    echo "tail -f /dev/null" >> /entrypoint.sh && \
-    chmod +x /entrypoint.sh
-
-# 8. Expose Ports
-# 6080 = Web Interface (NoVNC)
-EXPOSE 6080
-
-# ---------------------------------------------------------------------------
-# UPDATED LAYER: Install Tools, Themes, Fonts, and Configuration
-# ---------------------------------------------------------------------------
-
-# 1. Install System Tools & Dependencies
-RUN apt-get update && apt-get install -y \
-    terminator \
-    xarchiver \
-    zip unzip \
-    p7zip-full \
-    rar unrar \
-    tar gzip bzip2 xz-utils \
-    mousepad \
-    git \
-    sassc \
-    libglib2.0-dev-bin \
-    imagemagick \
-    wget \
-    fontconfig \
-    sudo
-
-# 3. Install Qogir Theme & Icons
-RUN git clone https://github.com/vinceliuice/Qogir-theme.git /tmp/Qogir-theme && \
-    /tmp/Qogir-theme/install.sh -d /usr/share/themes --tweaks square && \
-    git clone https://github.com/vinceliuice/Qogir-icon-theme.git /tmp/Qogir-icon-theme && \
-    /tmp/Qogir-icon-theme/install.sh -d /usr/share/icons && \
-    rm -rf /tmp/Qogir-theme /tmp/Qogir-icon-theme
-
-# 4. Configure XFCE Defaults (Themes, Fonts, Terminator)
-# Create necessary config directories
-RUN mkdir -p /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/ && \
-    mkdir -p /home/redkit/.config/xfce4/terminal/
-
-# B. Set Terminator as Default
-RUN update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/terminator 50 && \
-    update-alternatives --set x-terminal-emulator /usr/bin/terminator 
-RUN echo 'TerminalEmulator=terminator' > /home/redkit/.config/xfce4/helpers.rc
-
-# 5. Wallpapers
-COPY default.jpg /usr/share/backgrounds/xfce
-COPY xfce4-desktop.xml /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/
-
-RUN mkdir -p /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml
-
-# 6. Sudo Privileges
-RUN usermod -aG sudo redkit && echo 'root:root' | chpasswd && \
-    chown redkit:redkit /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml && \
-    chown -R redkit:redkit /home/redkit/.config && \
-    mkdir -p /home/redkit/.config/autostart/ &&\
-    echo "[Desktop Entry]\nType=Application\nName=XFCE Config Starter\nExec=xfconf-query -c xsettings -p /Net/ThemeName -s Qogir-Dark; xfconf-query -c xsettings -p /Net/IconThemeName -s Qogir-dark" > /home/redkit/.config/autostart/xfce-config-starter.desktop && \
-    chown redkit:redkit /home/redkit/.config/autostart/xfce-config-starter.desktop
-
-# -----------------------------------------------------------------------------
-# STEP 1: Add Sublime Text Repository
-# -----------------------------------------------------------------------------
-RUN mkdir -p /etc/apt/keyrings && \
-    wget -qO /etc/apt/keyrings/sublimehq-pub.gpg https://download.sublimetext.com/sublimehq-pub.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/sublimehq-pub.gpg] https://download.sublimetext.com/ apt/stable/" | tee /etc/apt/sources.list.d/sublime-text.list > /dev/null
-
-# -----------------------------------------------------------------------------
-# STEP 2: Install Sublime Text and Configure Defaults (REPLACED)
-# -----------------------------------------------------------------------------
+# 1. إضافة المستودعات وتثبيت كل شيء في Layer واحدة عملاقة (أفضل للمساحة)
+# 1. تثبيت wget و gnupg وتهيئة مستودع Sublime
 RUN apt-get update && \
-    apt-get install -y sublime-text mime-support && \
-    # Set system-wide default text editor
+    apt-get install -y --no-install-recommends wget gnupg ca-certificates && \
+    mkdir -p /etc/apt/keyrings && \
+    wget -qO /etc/apt/keyrings/sublimehq-pub.gpg https://download.sublimetext.com/sublimehq-pub.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/sublimehq-pub.gpg] https://download.sublimetext.com/ apt/stable/" > /etc/apt/sources.list.d/sublime-text.list
+
+# 2. التثبيت العملاق (مع إضافة تريكة الـ Fix-Missing)
+RUN apt-get update || apt-get update --fix-missing && \
+    apt-get install -y --no-install-recommends \
+    # GUI & VNC
+    xfce4 xfce4-terminal tigervnc-standalone-server tigervnc-tools \
+    novnc websockify dbus-x11 net-tools \
+    # Browsers & Editors
+    chromium supervisor libnss3-tools sublime-text \
+    # Tools & Utilities
+    openssh-server vim terminator xarchiver mousepad git sudo \
+    zip unzip p7zip-full rar unrar imagemagick \
+    # Fonts & Themes
+    fonts-ibm-plex papirus-icon-theme fonts-noto-core \
+    xfce4-whiskermenu-plugin xfce4-systemload-plugin xfce4-cpugraph-plugin \
+    # Build Essentials
+    build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
+    libsqlite3-dev tk-dev libffi-dev liblzma-dev sassc libglib2.0-bin \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# 2. نقل بايثون الجاهز
+COPY --from=python-builder /opt/pyenv /opt/pyenv
+
+# 3. تثبيت الـ Themes وتنظيف الـ Cache بتاعها فوراً
+# 3. تثبيت الـ Themes (بنعمل update و install ونمسحهم في نفس السطر عشان الحجم)
+RUN git clone --depth 1 https://github.com/vinceliuice/Qogir-theme.git /tmp/Qogir-theme && \
+    /tmp/Qogir-theme/install.sh -d /usr/share/themes --tweaks square && \
+    git clone --depth 1 https://github.com/RedK1t/Proxy.git /usr/share/Redkit-Proxy && \
+    git clone --depth 1 https://github.com/vinceliuice/Qogir-icon-theme.git /tmp/Qogir-icon-theme && \
+    /tmp/Qogir-icon-theme/install.sh -d /usr/share/icons && \
+    wget -qO- https://git.io/papirus-folders-install | sh && \
+    papirus-folders -C blue --theme Papirus-Dark && \
+    # التنظيف النهائي عشان نخسس الـ Layer
+    apt-get purge -y sassc libglib2.0-bin && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /tmp/Qogir* /var/lib/apt/lists/*
+
+RUN pip install -r /usr/share/Redkit-Proxy/requirements.txt && \
+    timeout 5s mitmdump || true && \
+    # 2. Setup NSS DB and Trust Certificate
+    mkdir -p /home/redkit/.pki/nssdb && \
+    certutil -d sql:/home/redkit/.pki/nssdb -N --empty-password && \
+    certutil -d sql:/home/redkit/.pki/nssdb -A -t "C,," -n "mitmproxy" -i /root/.mitmproxy/mitmproxy-ca-cert.pem && \
+    # 4. FORCE Proxy Settings via Policy
+    mkdir -p /etc/chromium/policies/managed && \
+    echo '{"ProxyMode":"fixed_servers","ProxyServer":"http://127.0.0.1:8080"}' > /etc/chromium/policies/managed/proxy.json && \
+    # 5. Fix Permissions
+    mkdir -p /home/redkit/.mitmproxy && \
+    cp /root/.mitmproxy/* /home/redkit/.mitmproxy/
+# 4. إعداد المستخدم
+RUN useradd -m -s /bin/bash redkit && usermod -aG sudo redkit && \
+    echo 'redkit:redkit' | chpasswd && echo 'root:root' | chpasswd && \
+    mkdir -p /var/run/sshd /home/redkit/.config/xfce4/terminal /home/redkit/.vnc
+
+# 5. الـ COPY الذكي (آخر حاجة عشان الكاش)
+COPY assets/ /
+
+# 6. اللمسات الأخيرة
+RUN update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/terminator 50 && \
+    update-alternatives --set x-terminal-emulator /usr/bin/terminator && \
     update-alternatives --install /usr/bin/editor editor /usr/bin/subl 100 && \
     update-alternatives --set editor /usr/bin/subl && \
-    # Set XFCE helper defaults for redkit
-    echo 'text/plain=subl' >> /home/redkit/.config/xfce4/helpers.rc && \
-    echo 'TerminalEditor=subl' >> /home/redkit/.config/xfce4/helpers.rc && \
-    # Ensure ownership is set
-    chown redkit:redkit /home/redkit/.config/xfce4/helpers.rc
-    # NOTE: We removed the failing 'sed' command for defaults.list
-	
-RUN apt-get update && apt-get install -y \
-    fonts-ibm-plex \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY fonts/60-ibm-plex.conf /etc/fonts/conf.d/
-COPY xsettings.xml /home/redkit/.config/xfce4/xfconf/xfce-perchannel-xml/
-
-COPY gtk/settings.ini /home/redkit/.config/gtk-3.0/settings.ini
-COPY xfce/terminalrc /home/redkit/.config/xfce4/terminal/terminalrc
-
-RUN chown -R redkit:redkit /home/redkit/.config
+    # Fix 'No such file' error by creating the config directory first
+    mkdir -p /root/.config /home/redkit/.config && \
+    touch /root/.config/mimeapps.list && \
+    xdg-settings set default-web-browser chromium.desktop && \
+    # Force Chromium to use the local proxy (8080) via system policy
+    mkdir -p /etc/chromium/policies/managed && \
+    echo '{"ProxyMode":"fixed_servers","ProxyServer":"http://127.0.0.1:8080"}' > /etc/chromium/policies/managed/proxy.json && \
+    # Ensure permissions are correct across all sensitive directories
+    chown -R redkit:redkit /home/redkit /opt/pyenv/shims /home/redkit/.pki /home/redkit/.mitmproxy && \
+    chmod +x /entrypoint.sh && \
+    chmod +x /home/redkit/.config/tigervnc/xstartup && \
+    fc-cache -f -v
 
 
+# Layer 4: FoxyProxy extension and Chromium sandbox fix
+RUN mkdir -p /etc/chromium/policies/managed /usr/share/chromium/extensions && \
+    # Policy: Only force-install FoxyProxy, disable sandbox warnings, no forced proxy
+    echo '{\
+  "ExtensionInstallForcelist": ["gcknhkkoolaabfmlnjonogaaifnjlfnp;https://clients2.google.com/service/update2/crx"],\
+  "ChromeAppsEnabled": false,\
+  "SuppressUnsupportedOSWarning": true\
+}' > /etc/chromium/policies/managed/foxyproxy-only.json && \
+    # Pre-configure FoxyProxy with localhost:8080 as default (user can still disable/enable via extension)
+    mkdir -p /home/redkit/.config/chromium/Default/Extensions/gcknhkkoolaabfmlnjonogaaifnjlfnp/7.5.1.0 && \
+    # Move original binary and create wrapper that ALWAYS uses --no-sandbox
+    mv /usr/bin/chromium /usr/bin/chromium-original && \
+    echo '#!/bin/bash\n/usr/bin/chromium-original --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage "$@"' > /usr/bin/chromium && \
+    chmod +x /usr/bin/chromium && \
+    # Also wrap chromium-browser if it exists
+    if [ -f /usr/bin/chromium-browser ]; then \
+        mv /usr/bin/chromium-browser /usr/bin/chromium-browser-original && \
+        echo '#!/bin/bash\n/usr/bin/chromium-browser-original --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage "$@"' > /usr/bin/chromium-browser && \
+        chmod +x /usr/bin/chromium-browser; \
+    fi && \
+    # Update alternatives to point to our wrapper
+    update-alternatives --install /usr/bin/x-www-browser x-www-browser /usr/bin/chromium 100 && \
+    update-alternatives --set x-www-browser /usr/bin/chromium && \
+    update-alternatives --install /usr/bin/gnome-www-browser gnome-www-browser /usr/bin/chromium 100 && \
+    update-alternatives --set gnome-www-browser /usr/bin/chromium && \
+    chown -R redkit:redkit /home/redkit/.config/chromium
 
-# Optional: allow sudo without password
-# RUN echo "redkit ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-redkit && \
-#     chmod 440 /etc/sudoers.d/90-redkit
-
-# 9. Start as Root
-# We must start as root to launch sshd, but we switch to redkit for VNC inside the script
+EXPOSE 6080
 USER root
 CMD ["/entrypoint.sh"]

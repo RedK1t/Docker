@@ -3,7 +3,7 @@
 <channel name="xsettings" version="1.0">
   <property name="Net" type="empty">
     <property name="ThemeName" type="string" value="Qogir-Dark"/>
-    <property name="IconThemeName" type="string" value="Qogir-dark"/>
+    <property name="IconThemeName" type="string" value="Qogir-Dark"/>
     <property name="DoubleClickTime" type="empty"/>
     <property name="DoubleClickDistance" type="empty"/>
     <property name="DndDragThreshold" type="empty"/>
@@ -13,7 +13,6 @@
     <property name="EnableEventSounds" type="empty"/>
     <property name="EnableInputFeedbackSounds" type="empty"/>
   </property>
-
   <property name="Xft" type="empty">
     <property name="DPI" type="empty"/>
     <property name="Antialias" type="empty"/>
@@ -21,17 +20,11 @@
     <property name="HintStyle" type="empty"/>
     <property name="RGBA" type="empty"/>
   </property>
-
   <property name="Gtk" type="empty">
     <property name="CanChangeAccels" type="empty"/>
     <property name="ColorPalette" type="empty"/>
-
-    <!-- Default GUI font -->
     <property name="FontName" type="string" value="IBM Plex Sans 10"/>
-
-    <!-- Default monospace font -->
     <property name="MonospaceFontName" type="string" value="IBM Plex Mono 10"/>
-
     <property name="IconSizes" type="empty"/>
     <property name="KeyThemeName" type="empty"/>
     <property name="MenuImages" type="empty"/>
@@ -43,7 +36,6 @@
     <property name="DialogsUseHeader" type="empty"/>
     <property name="TitlebarMiddleClick" type="empty"/>
   </property>
-
   <property name="Gdk" type="empty">
     <property name="WindowScalingFactor" type="empty"/>
   </property>

@@ -1,0 +1,28 @@
+[global_config]
+[keybindings]
+[profiles]
+  [[default]]
+    background_darkness = 0.85
+    background_type = transparent
+    cursor_shape = ibeam
+    font = IBM Plex Mono Medium 10
+    use_system_font = False
+    use_theme_colors = True
+    title_hide_sizetext = True
+    title_transmit_fg_color = "#282a33"
+    title_transmit_bg_color = "#282a33"
+    title_receive_fg_color = "#282a33"
+    title_receive_bg_color = "#282a33"
+    title_inactive_fg_color = "#282a33"
+    title_inactive_bg_color = "#282a33"
+    title_use_system_font = False
+[layouts]
+  [[default]]
+    [[[window0]]]
+      type = Window
+      parent = ""
+    [[[child1]]]
+      type = Terminal
+      parent = window0
+      profile = default
+[plugins]
