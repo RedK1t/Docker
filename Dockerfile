@@ -131,6 +131,6 @@ RUN mkdir -p /etc/chromium/policies/managed /usr/share/chromium/extensions && \
     update-alternatives --set gnome-www-browser /usr/bin/chromium && \
     chown -R redkit:redkit /home/redkit/.config/chromium
 
-EXPOSE 6080
+EXPOSE 6080 5050
 USER root
 CMD ["/entrypoint.sh"]
