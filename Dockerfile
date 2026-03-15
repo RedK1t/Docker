@@ -40,7 +40,7 @@ RUN apt-get update || apt-get update --fix-missing && \
     openssh-server vim terminator xarchiver mousepad git sudo \
     zip unzip p7zip-full rar unrar imagemagick \
     # Fonts & Themes
-    fonts-ibm-plex papirus-icon-theme fonts-noto-core \
+    fonts-ibm-plex papirus-icon-theme fonts-noto-core kali-themes \
     xfce4-whiskermenu-plugin xfce4-systemload-plugin xfce4-cpugraph-plugin \
     # Build Essentials
     build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
@@ -52,18 +52,12 @@ COPY --from=python-builder /opt/pyenv /opt/pyenv
 
 # 3. تثبيت الـ Themes وتنظيف الـ Cache بتاعها فوراً
 # 3. تثبيت الـ Themes (بنعمل update و install ونمسحهم في نفس السطر عشان الحجم)
-RUN git clone --depth 1 https://github.com/vinceliuice/Qogir-theme.git /tmp/Qogir-theme && \
-    /tmp/Qogir-theme/install.sh -d /usr/share/themes --tweaks square && \
-    git clone --depth 1 https://github.com/RedK1t/Proxy.git /usr/share/Redkit-Proxy && \
-    git clone --depth 1 https://github.com/vinceliuice/Qogir-icon-theme.git /tmp/Qogir-icon-theme && \
-    /tmp/Qogir-icon-theme/install.sh -d /usr/share/icons && \
-    wget -qO- https://git.io/papirus-folders-install | sh && \
-    papirus-folders -C blue --theme Papirus-Dark && \
+RUN git clone --depth 1 https://github.com/RedK1t/Proxy.git /usr/share/Redkit-Proxy && \
     # التنظيف النهائي عشان نخسس الـ Layer
     apt-get purge -y sassc libglib2.0-bin && \
     apt-get autoremove -y && \
     apt-get clean && \
-    rm -rf /tmp/Qogir* /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/*
 
 RUN pip install -r /usr/share/Redkit-Proxy/requirements.txt && \
     timeout 5s mitmdump || true && \
@@ -103,7 +97,8 @@ RUN update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulat
     chmod +x /home/redkit/.config/tigervnc/xstartup && \
     fc-cache -f -v
 
-
+ENV GTK_THEME=Kali-Dark-Red
+ENV ICON_THEME=Flat-Remix-Red-Dark
 # Layer 4: FoxyProxy extension and Chromium sandbox fix
 RUN mkdir -p /etc/chromium/policies/managed /usr/share/chromium/extensions && \
     # Policy: Only force-install FoxyProxy, disable sandbox warnings, no forced proxy
