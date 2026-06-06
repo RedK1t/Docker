@@ -126,6 +126,17 @@ RUN mkdir -p /etc/chromium/policies/managed /usr/share/chromium/extensions && \
     update-alternatives --set gnome-www-browser /usr/bin/chromium && \
     chown -R redkit:redkit /home/redkit/.config/chromium
 
+# Layer 5: Buster (Captcha Solver) force-install — appended last so upper layers stay cached.
+# FoxyProxy is already configured above; this only ADDS Buster to the existing force-list,
+# editing it in place (Chromium does not reliably merge the policy across separate files).
+RUN python -c "import json,os; \
+p='/etc/chromium/policies/managed/foxyproxy-only.json'; \
+d=json.load(open(p)) if os.path.exists(p) else {}; \
+l=d.setdefault('ExtensionInstallForcelist',[]); \
+e='mpbjkejclgfgadiemmefgebjfooflfhl;https://clients2.google.com/service/update2/crx'; \
+(e in l) or l.append(e); \
+json.dump(d,open(p,'w'),indent=2)"
+
 EXPOSE 6080 5050
 USER root
 CMD ["/entrypoint.sh"]
